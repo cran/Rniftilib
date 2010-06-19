@@ -1,7 +1,7 @@
 Package: Rniftilib
-Version: 0.0-27
-Date: 2009-08-03
-Title: Rniftilib 0.0-27
+Version: 0.0-29
+Date: 2010-06-19
+Title: Rniftilib - R Interface to NIFTICLIB (V1.1.0)
 Author: Oliver Granert <o.granert <at> neurologie.uni-kiel.de>
 Maintainer: Oliver Granert <o.granert@neurologie.uni-kiel.de>
 Depends: R (>= 1.8.0)
@@ -12,6 +12,6 @@ License: GPL (>= 2)
 URL: http://rniftilib.r-forge.r-project.org/
 Repository: CRAN
 Repository/R-Forge/Project: rniftilib
-Repository/R-Forge/Revision: 22
-Date/Publication: 2009-08-04 14:22:00
-Packaged: 2009-08-03 20:28:33 UTC; rforge
+Repository/R-Forge/Revision: 27
+Date/Publication: 2010-08-11 19:32:21
+Packaged: 2010-07-01 20:48:37 UTC; rforge

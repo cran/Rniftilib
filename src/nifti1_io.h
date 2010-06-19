@@ -172,7 +172,7 @@ typedef struct {                /*!< Image storage struct **/
   nifti1_extension * ext_list ; /*!< array of extension structs (with data) */
   analyze_75_orient_code analyze75_orient; /*!< for old analyze files, orient */
 
-} nifti_image ;
+} __attribute__((__packed__)) nifti_image ;
 
 
 
@@ -243,7 +243,7 @@ typedef struct {
        int field_skip;                  /* 180 + 4                        */
        int omax, omin;                  /* 184 + 8                        */
        int smax, smin;                  /* 192 + 8              200 bytes */
-} nifti_analyze75;                                   /* total:  348 bytes */
+} __attribute__((__packed__)) nifti_analyze75;                                   /* total:  348 bytes */
 
 
 /*****************************************************************************/
@@ -275,7 +275,7 @@ void  nifti_swap_Nbytes ( int n , int siz , void *ar ) ;
 
 int    nifti_datatype_is_valid   (int dtype, int for_nifti);
 int    nifti_datatype_from_string(const char * name);
-char * nifti_datatype_to_string  (int dtype);
+const char *nifti_datatype_to_string  (int dtype);
 
 int   nifti_get_filesize( const char *pathname ) ;
 void  swap_nifti_header ( struct nifti_1_header *h , int is_nifti ) ;
