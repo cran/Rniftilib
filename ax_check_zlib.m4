@@ -1,10 +1,10 @@
 # ===========================================================================
-#           http://www.nongnu.org/autoconf-archive/check_zlib.html
+#       http://www.gnu.org/software/autoconf-archive/ax_check_zlib.html
 # ===========================================================================
 #
 # SYNOPSIS
 #
-#   CHECK_ZLIB()
+#   AX_CHECK_ZLIB()
 #
 # DESCRIPTION
 #
@@ -56,7 +56,10 @@
 #   modified version of the Autoconf Macro, you may extend this special
 #   exception to the GPL to apply to your modified version as well.
 
-AC_DEFUN([CHECK_ZLIB],
+#serial 7
+
+AU_ALIAS([CHECK_ZLIB], [AX_CHECK_ZLIB])
+AC_DEFUN([AX_CHECK_ZLIB],
 #
 # Handle user hints
 #
@@ -75,7 +78,8 @@ AC_ARG_WITH(zlib,
   fi
 else
   AC_MSG_RESULT(no)
-fi])
+fi],
+[AC_MSG_RESULT(yes)])
 
 ZLIB_HOME=/usr/local
 if test ! -f "${ZLIB_HOME}/include/zlib.h"

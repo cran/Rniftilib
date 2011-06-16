@@ -48,6 +48,11 @@ nifti.image.getdim.save <- function(nim, index)
   retval   
 }
 
+is.nifti <- function(x)
+{
+  is(x,"nifti")
+}
+
 "[.nifti" <- function(x, 
                       dim1=1:nifti.image.getdim.save(x,1),
                       dim2=1:nifti.image.getdim.save(x,2),
@@ -88,6 +93,12 @@ nifti.image.getdim.save <- function(nim, index)
 nifti.image.setdatatype <- function(nim, value)
 {
   .Call("Rnifti_image_setdatatype", nim, value, PACKAGE="Rniftilib")
+}
+
+# EXPERIMENTAL function
+nifti.read.subregion.image <- function(nim, start_index, region_size)
+{
+  .Call("Rnifti_read_subregion_image", nim, start_index, region_size, PACKAGE="Rniftilib")
 }
 
 nifti.interpolate3d <- function(nim, x, y, z, t=1)
