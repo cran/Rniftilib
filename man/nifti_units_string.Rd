@@ -1,6 +1,6 @@
 \name{nifti.units.string}
 \alias{nifti.units.string}
-\title{Unload NIfTI image data}
+\title{Return string for NIfTI-1 unit code value.}
 \description{
 Return a string holding the name of a NIFTI units type.
 }
@@ -14,7 +14,7 @@ nifti.units.string(value)
 Return a string holding the name of a NIFTI units type.    
 }
 \value{
-string for the given unit type
+String for the given unit type value.
 }
 \references{
   \url{http://nifti.nimh.nih.gov}
@@ -22,6 +22,7 @@ string for the given unit type
 }
 
 \seealso{ 
+  \code{\link{nifti.datatype.string}},
   \code{\link{nifti.image.write}},
   \code{\link{nifti.image.read}}
 }

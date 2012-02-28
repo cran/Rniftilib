@@ -812,22 +812,31 @@ SEXP Rnifti_image_copy_info(SEXP nim)
   return ret_val;
 }
 
-SEXP Rnifti_image_read(SEXP file, SEXP read_data)
+SEXP Rnifti_image_read(SEXP file, SEXP read_data, SEXP rmNaN)
 {
   nifti_image *pnim;
   PROTECT(read_data = AS_INTEGER(read_data));
   PROTECT(file = AS_CHARACTER(file));
+  PROTECT(rmNaN = AS_LOGICAL(rmNaN));
   if(!isString(file) || length(file) != 1)
-    error("Rnifti_image_read: file is not a single string\n");
+  {  error("Rnifti_image_read: file is not a single string\n"); return R_NilValue; }
+  if(!isLogical(rmNaN) || length(rmNaN) != 1)
+  {  error("Rnifti_image_read: rm.NaN is not a single logical\n"); return R_NilValue; }
+  int int_rmNaN = (int)(LOGICAL_POINTER(rmNaN)[0]);
+  if(int_rmNaN<0)
+  {  error("Rnifti_image_read: rm.NaN is not a valid logical\n"); return R_NilValue; }
   if(length(read_data) != 1)
-    error("Rnifti_image_read: read_data is not a single integer\n");
+  {  error("Rnifti_image_read: read_data is not a single integer\n"); return R_NilValue; }
   int *piread_data = INTEGER_POINTER(read_data);
   const char *pcfilename  = CHAR(STRING_ELT(file , 0));
-  pnim = nifti_image_read( pcfilename , piread_data[0] ) ;
+  
+  
+  
+  pnim = nifti_image_read_NaN( pcfilename , piread_data[0], int_rmNaN ) ;
   if(pnim==NULL)
     {
       error("Rnifti_image_read: Can not open file \"%s\"",pcfilename);
-      UNPROTECT(2);
+      UNPROTECT(3);
       return R_NilValue;
     }
 
@@ -839,7 +848,7 @@ SEXP Rnifti_image_read(SEXP file, SEXP read_data)
   PROTECT(classattrib = allocVector(STRSXP, 1));
   SET_STRING_ELT(classattrib, 0, mkChar("nifti"));
   classgets(nim, classattrib);
-  UNPROTECT(3);
+  UNPROTECT(4);
   return nim;
 }
 
@@ -854,7 +863,7 @@ SEXP Rnifti_image_write(SEXP nim)
   return R_NilValue;
 }
 
-SEXP Rnifti_image_getdim(SEXP nim)
+/*SEXP Rnifti_image_getdim(SEXP nim)
 {
   SEXP ret_val=R_NilValue;
   nifti_image *pnim=SEXP2NIFTI(nim);
@@ -868,7 +877,7 @@ SEXP Rnifti_image_getdim(SEXP nim)
       UNPROTECT(1);
     }
   return ret_val;
-}
+}*/
 
 SEXP Rnifti_image_getpixel2(SEXP sexp_args)
 {
@@ -1408,9 +1417,27 @@ SEXP Rnifti_image_setpixel(
     if(LENGTH(value)>total || total%LENGTH(value)!=0)
     {
       UNPROTECT(7);
-      error("number of items to replace is not a multiple of replacement length");
+      error("Number of items to replace is not a multiple of replacement length!");
       return nim;
     }
+
+#define LOOP_START   for(iIndex[6]=0;iIndex[6]<LENGTH(coord[6]);++iIndex[6]) \
+			for(iIndex[5]=0;iIndex[5]<LENGTH(coord[5]);++iIndex[5]) \
+			  for(iIndex[4]=0;iIndex[4]<LENGTH(coord[4]);++iIndex[4]) \
+				for(iIndex[3]=0;iIndex[3]<LENGTH(coord[3]);++iIndex[3]) \
+				  for(iIndex[2]=0;iIndex[2]<LENGTH(coord[2]);++iIndex[2]) \
+					for(iIndex[1]=0;iIndex[1]<LENGTH(coord[1]);++iIndex[1]) \
+					  for(iIndex[0]=0;iIndex[0]<LENGTH(coord[0]);++iIndex[0]) \
+					  { \
+						iTOffset =  iCoord[0][iIndex[0]] \
+								  + iCoord[1][iIndex[1]]*pnim->dim[1] \
+								  + iCoord[2][iIndex[2]]*pnim->dim[1]*pnim->dim[2] \
+								  + iCoord[3][iIndex[3]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3] \
+								  + iCoord[4][iIndex[4]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4] \
+								  + iCoord[5][iIndex[5]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5] \
+								  + iCoord[6][iIndex[6]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]*pnim->dim[6];
+
+#define LOOP_END 				++iSOffset; if(iSOffset==LENGTH(value)) iSOffset=0; } break; 
 
     if(IS_NUMERIC(value))
     {
@@ -1418,293 +1445,148 @@ SEXP Rnifti_image_setpixel(
 		{
 		/* uchar (8 bits) */
 		case DT_UNSIGNED_CHAR:
-		  for(iIndex[6]=0;iIndex[6]<LENGTH(coord[6]);++iIndex[6])
-			for(iIndex[5]=0;iIndex[5]<LENGTH(coord[5]);++iIndex[5])
-			  for(iIndex[4]=0;iIndex[4]<LENGTH(coord[4]);++iIndex[4])
-				for(iIndex[3]=0;iIndex[3]<LENGTH(coord[3]);++iIndex[3])
-				  for(iIndex[2]=0;iIndex[2]<LENGTH(coord[2]);++iIndex[2])
-					for(iIndex[1]=0;iIndex[1]<LENGTH(coord[1]);++iIndex[1])
-					  for(iIndex[0]=0;iIndex[0]<LENGTH(coord[0]);++iIndex[0])
-					  {
-						iTOffset =  iCoord[0][iIndex[0]]
-								  + iCoord[1][iIndex[1]]*pnim->dim[1]
-								  + iCoord[2][iIndex[2]]*pnim->dim[1]*pnim->dim[2]
-								  + iCoord[3][iIndex[3]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]
-								  + iCoord[4][iIndex[4]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]
-								  + iCoord[5][iIndex[5]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]
-								  + iCoord[6][iIndex[6]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]*pnim->dim[6];
-						((unsigned char*)pnim->data)[iTOffset]=(unsigned char)(NUMERIC_POINTER(value)[iSOffset]);
-						++iSOffset; if(iSOffset==LENGTH(value)) iSOffset=0;
-					  }
-		  break;
+                  LOOP_START
+		    ((unsigned char*)pnim->data)[iTOffset]=(unsigned char)(NUMERIC_POINTER(value)[iSOffset]);
+		  LOOP_END
 		/* signed char (8 bits) */
 		case DT_INT8:
-		  for(iIndex[6]=0;iIndex[6]<LENGTH(coord[6]);++iIndex[6])
-			for(iIndex[5]=0;iIndex[5]<LENGTH(coord[5]);++iIndex[5])
-			  for(iIndex[4]=0;iIndex[4]<LENGTH(coord[4]);++iIndex[4])
-				for(iIndex[3]=0;iIndex[3]<LENGTH(coord[3]);++iIndex[3])
-				  for(iIndex[2]=0;iIndex[2]<LENGTH(coord[2]);++iIndex[2])
-					for(iIndex[1]=0;iIndex[1]<LENGTH(coord[1]);++iIndex[1])
-					  for(iIndex[0]=0;iIndex[0]<LENGTH(coord[0]);++iIndex[0])
-					  {
-						iTOffset =  iCoord[0][iIndex[0]]
-								  + iCoord[1][iIndex[1]]*pnim->dim[1]
-								  + iCoord[2][iIndex[2]]*pnim->dim[1]*pnim->dim[2]
-								  + iCoord[3][iIndex[3]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]
-								  + iCoord[4][iIndex[4]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]
-								  + iCoord[5][iIndex[5]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]
-								  + iCoord[6][iIndex[6]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]*pnim->dim[6];
-						((signed char*)pnim->data)[iTOffset]=(signed char)(NUMERIC_POINTER(value)[iSOffset]);
-						++iSOffset; if(iSOffset==LENGTH(value)) iSOffset=0;
-					  }
-			  break;
+                  LOOP_START
+		    ((signed char*)pnim->data)[iTOffset]=(signed char)(NUMERIC_POINTER(value)[iSOffset]);
+		  LOOP_END
 		/* unsigned short (16 bits) */
 		case DT_UINT16:
-		  for(iIndex[6]=0;iIndex[6]<LENGTH(coord[6]);++iIndex[6])
-			for(iIndex[5]=0;iIndex[5]<LENGTH(coord[5]);++iIndex[5])
-			  for(iIndex[4]=0;iIndex[4]<LENGTH(coord[4]);++iIndex[4])
-				for(iIndex[3]=0;iIndex[3]<LENGTH(coord[3]);++iIndex[3])
-				  for(iIndex[2]=0;iIndex[2]<LENGTH(coord[2]);++iIndex[2])
-					for(iIndex[1]=0;iIndex[1]<LENGTH(coord[1]);++iIndex[1])
-					  for(iIndex[0]=0;iIndex[0]<LENGTH(coord[0]);++iIndex[0])
-					  {
-						iTOffset =  iCoord[0][iIndex[0]]
-								  + iCoord[1][iIndex[1]]*pnim->dim[1]
-								  + iCoord[2][iIndex[2]]*pnim->dim[1]*pnim->dim[2]
-								  + iCoord[3][iIndex[3]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]
-								  + iCoord[4][iIndex[4]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]
-								  + iCoord[5][iIndex[5]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]
-								  + iCoord[6][iIndex[6]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]*pnim->dim[6];
-						((unsigned short*)pnim->data)[iTOffset]=(unsigned short)(NUMERIC_POINTER(value)[iSOffset]);
-						++iSOffset; if(iSOffset==LENGTH(value)) iSOffset=0;
-					  }
-		  break;
+                  LOOP_START
+		    ((unsigned short*)pnim->data)[iTOffset]=(unsigned short)(NUMERIC_POINTER(value)[iSOffset]);
+		  LOOP_END
 		// signed short (16 bits)
 		case DT_SIGNED_SHORT:
-		  //((short*)pnim->data)[x+y*pnim->dim[1]+z*pnim->dim[1]*pnim->dim[2]+t*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]]=(short)NUMERIC_POINTER(value)[0];
-		  for(iIndex[6]=0;iIndex[6]<LENGTH(coord[6]);++iIndex[6])
-			for(iIndex[5]=0;iIndex[5]<LENGTH(coord[5]);++iIndex[5])
-			  for(iIndex[4]=0;iIndex[4]<LENGTH(coord[4]);++iIndex[4])
-				for(iIndex[3]=0;iIndex[3]<LENGTH(coord[3]);++iIndex[3])
-				  for(iIndex[2]=0;iIndex[2]<LENGTH(coord[2]);++iIndex[2])
-					for(iIndex[1]=0;iIndex[1]<LENGTH(coord[1]);++iIndex[1])
-					  for(iIndex[0]=0;iIndex[0]<LENGTH(coord[0]);++iIndex[0])
-					  {
-						iTOffset =  iCoord[0][iIndex[0]]
-								  + iCoord[1][iIndex[1]]*pnim->dim[1]
-								  + iCoord[2][iIndex[2]]*pnim->dim[1]*pnim->dim[2]
-								  + iCoord[3][iIndex[3]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]
-								  + iCoord[4][iIndex[4]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]
-								  + iCoord[5][iIndex[5]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]
-								  + iCoord[6][iIndex[6]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]*pnim->dim[6];
-						((short*)pnim->data)[iTOffset]=(short)(NUMERIC_POINTER(value)[iSOffset]);
-						++iSOffset; if(iSOffset==LENGTH(value)) iSOffset=0;
-					  }
-		  break;
-		// signed int (32 bits)
+		  LOOP_START
+		    ((short*)pnim->data)[iTOffset]=(short)(NUMERIC_POINTER(value)[iSOffset]);
+                  LOOP_END		
+                // signed int (32 bits)
 		case DT_SIGNED_INT:
-		  for(iIndex[6]=0;iIndex[6]<LENGTH(coord[6]);++iIndex[6])
-			for(iIndex[5]=0;iIndex[5]<LENGTH(coord[5]);++iIndex[5])
-			  for(iIndex[4]=0;iIndex[4]<LENGTH(coord[4]);++iIndex[4])
-				for(iIndex[3]=0;iIndex[3]<LENGTH(coord[3]);++iIndex[3])
-				  for(iIndex[2]=0;iIndex[2]<LENGTH(coord[2]);++iIndex[2])
-					for(iIndex[1]=0;iIndex[1]<LENGTH(coord[1]);++iIndex[1])
-					  for(iIndex[0]=0;iIndex[0]<LENGTH(coord[0]);++iIndex[0])
-					  {
-						iTOffset =  iCoord[0][iIndex[0]]
-								  + iCoord[1][iIndex[1]]*pnim->dim[1]
-								  + iCoord[2][iIndex[2]]*pnim->dim[1]*pnim->dim[2]
-								  + iCoord[3][iIndex[3]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]
-								  + iCoord[4][iIndex[4]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]
-								  + iCoord[5][iIndex[5]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]
-								  + iCoord[6][iIndex[6]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]*pnim->dim[6];
-						((int*)pnim->data)[iTOffset]=(int)(NUMERIC_POINTER(value)[iSOffset]);
-						++iSOffset; if(iSOffset==LENGTH(value)) iSOffset=0;
-					  }
-		  break;
+                  LOOP_START
+		    ((int*)pnim->data)[iTOffset]=(int)(NUMERIC_POINTER(value)[iSOffset]);
+		  LOOP_END
 		/* unsigned int (32 bits) */
 		case DT_UINT32:
-		  for(iIndex[6]=0;iIndex[6]<LENGTH(coord[6]);++iIndex[6])
-			for(iIndex[5]=0;iIndex[5]<LENGTH(coord[5]);++iIndex[5])
-			  for(iIndex[4]=0;iIndex[4]<LENGTH(coord[4]);++iIndex[4])
-				for(iIndex[3]=0;iIndex[3]<LENGTH(coord[3]);++iIndex[3])
-				  for(iIndex[2]=0;iIndex[2]<LENGTH(coord[2]);++iIndex[2])
-					for(iIndex[1]=0;iIndex[1]<LENGTH(coord[1]);++iIndex[1])
-					  for(iIndex[0]=0;iIndex[0]<LENGTH(coord[0]);++iIndex[0])
-					  {
-						iTOffset =  iCoord[0][iIndex[0]]
-								  + iCoord[1][iIndex[1]]*pnim->dim[1]
-								  + iCoord[2][iIndex[2]]*pnim->dim[1]*pnim->dim[2]
-								  + iCoord[3][iIndex[3]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]
-								  + iCoord[4][iIndex[4]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]
-								  + iCoord[5][iIndex[5]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]
-								  + iCoord[6][iIndex[6]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]*pnim->dim[6];
-						((unsigned int*)pnim->data)[iTOffset]=(unsigned int)(NUMERIC_POINTER(value)[iSOffset]);
-						++iSOffset; if(iSOffset==LENGTH(value)) iSOffset=0;
-					  }
-		  break;
+                  LOOP_START
+	            ((unsigned int*)pnim->data)[iTOffset]=(unsigned int)(NUMERIC_POINTER(value)[iSOffset]);
+                  LOOP_END
 		/* float (32 bits) */
 		case DT_FLOAT:
-		  for(iIndex[6]=0;iIndex[6]<LENGTH(coord[6]);++iIndex[6])
-			for(iIndex[5]=0;iIndex[5]<LENGTH(coord[5]);++iIndex[5])
-			  for(iIndex[4]=0;iIndex[4]<LENGTH(coord[4]);++iIndex[4])
-				for(iIndex[3]=0;iIndex[3]<LENGTH(coord[3]);++iIndex[3])
-				  for(iIndex[2]=0;iIndex[2]<LENGTH(coord[2]);++iIndex[2])
-					for(iIndex[1]=0;iIndex[1]<LENGTH(coord[1]);++iIndex[1])
-					  for(iIndex[0]=0;iIndex[0]<LENGTH(coord[0]);++iIndex[0])
-					  {
-						iTOffset =  iCoord[0][iIndex[0]]
-								  + iCoord[1][iIndex[1]]*pnim->dim[1]
-								  + iCoord[2][iIndex[2]]*pnim->dim[1]*pnim->dim[2]
-								  + iCoord[3][iIndex[3]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]
-								  + iCoord[4][iIndex[4]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]
-								  + iCoord[5][iIndex[5]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]
-								  + iCoord[6][iIndex[6]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]*pnim->dim[6];
-						((float*)pnim->data)[iTOffset]=(float)(NUMERIC_POINTER(value)[iSOffset]);
-						++iSOffset; if(iSOffset==LENGTH(value)) iSOffset=0;
-					  }
-		  break;
+		  LOOP_START
+		    ((float*)pnim->data)[iTOffset]=(float)(NUMERIC_POINTER(value)[iSOffset]);
+		  LOOP_END
 		/* double (64 bits) */
 		case DT_DOUBLE:
-		  for(iIndex[6]=0;iIndex[6]<LENGTH(coord[6]);++iIndex[6])
-				for(iIndex[5]=0;iIndex[5]<LENGTH(coord[5]);++iIndex[5])
-				  for(iIndex[4]=0;iIndex[4]<LENGTH(coord[4]);++iIndex[4])
-					for(iIndex[3]=0;iIndex[3]<LENGTH(coord[3]);++iIndex[3])
-					  for(iIndex[2]=0;iIndex[2]<LENGTH(coord[2]);++iIndex[2])
-						for(iIndex[1]=0;iIndex[1]<LENGTH(coord[1]);++iIndex[1])
-						  for(iIndex[0]=0;iIndex[0]<LENGTH(coord[0]);++iIndex[0])
-						  {
-							iTOffset =  iCoord[0][iIndex[0]]
-									  + iCoord[1][iIndex[1]]*pnim->dim[1]
-									  + iCoord[2][iIndex[2]]*pnim->dim[1]*pnim->dim[2]
-									  + iCoord[3][iIndex[3]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]
-									  + iCoord[4][iIndex[4]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]
-									  + iCoord[5][iIndex[5]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]
-									  + iCoord[6][iIndex[6]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]*pnim->dim[6];
-							((double*)pnim->data)[iTOffset]=(double)(NUMERIC_POINTER(value)[iSOffset]);
-							++iSOffset; if(iSOffset==LENGTH(value)) iSOffset=0;
-						  }
-		  break;
-		  /* rgb (24 bits) */
-			case DT_RGB:
-			  for(iIndex[6]=0;iIndex[6]<LENGTH(coord[6]);++iIndex[6])
-					for(iIndex[5]=0;iIndex[5]<LENGTH(coord[5]);++iIndex[5])
-					  for(iIndex[4]=0;iIndex[4]<LENGTH(coord[4]);++iIndex[4])
-						for(iIndex[3]=0;iIndex[3]<LENGTH(coord[3]);++iIndex[3])
-						  for(iIndex[2]=0;iIndex[2]<LENGTH(coord[2]);++iIndex[2])
-							for(iIndex[1]=0;iIndex[1]<LENGTH(coord[1]);++iIndex[1])
-							  for(iIndex[0]=0;iIndex[0]<LENGTH(coord[0]);++iIndex[0])
-							  {
-								iTOffset =  iCoord[0][iIndex[0]]
-										  + iCoord[1][iIndex[1]]*pnim->dim[1]
-										  + iCoord[2][iIndex[2]]*pnim->dim[1]*pnim->dim[2]
-										  + iCoord[3][iIndex[3]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]
-										  + iCoord[4][iIndex[4]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]
-										  + iCoord[5][iIndex[5]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]
-										  + iCoord[6][iIndex[6]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]*pnim->dim[6];
-								unsigned r,g,b;
-								Rprintf("%s\n",CHAR(CHARACTER_POINTER(value)[iSOffset]));
-								sscanf(CHAR(CHARACTER_POINTER(value)[iSOffset]),"#%2X%2X%2X",&r,&g,&b);
-								Rprintf("%d %d %d\n",r,g,b);
-								((unsigned char *)pnim->data)[iTOffset*3+0]=(unsigned char)r;
-								((unsigned char *)pnim->data)[iTOffset*3+1]=(unsigned char)g;
-								((unsigned char *)pnim->data)[iTOffset*3+2]=(unsigned char)b;
-								++iSOffset; if(iSOffset==LENGTH(value)) iSOffset=0;
-							  }
-			  break;
-			/* rgba (32 bits) */
-			case DT_RGBA32:
-			  for(iIndex[6]=0;iIndex[6]<LENGTH(coord[6]);++iIndex[6])
-					for(iIndex[5]=0;iIndex[5]<LENGTH(coord[5]);++iIndex[5])
-					  for(iIndex[4]=0;iIndex[4]<LENGTH(coord[4]);++iIndex[4])
-						for(iIndex[3]=0;iIndex[3]<LENGTH(coord[3]);++iIndex[3])
-						  for(iIndex[2]=0;iIndex[2]<LENGTH(coord[2]);++iIndex[2])
-							for(iIndex[1]=0;iIndex[1]<LENGTH(coord[1]);++iIndex[1])
-							  for(iIndex[0]=0;iIndex[0]<LENGTH(coord[0]);++iIndex[0])
-							  {
-								iTOffset =  iCoord[0][iIndex[0]]
-										  + iCoord[1][iIndex[1]]*pnim->dim[1]
-										  + iCoord[2][iIndex[2]]*pnim->dim[1]*pnim->dim[2]
-										  + iCoord[3][iIndex[3]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]
-										  + iCoord[4][iIndex[4]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]
-										  + iCoord[5][iIndex[5]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]
-										  + iCoord[6][iIndex[6]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]*pnim->dim[6];
-								unsigned r,g,b,a;
-								sscanf(CHAR(CHARACTER_POINTER(value)[iSOffset]),"#%2X%2X%2X%2X",&r,&g,&b,&a);
-								((unsigned char *)pnim->data)[iTOffset*4+0]=(unsigned char)r;
-								((unsigned char *)pnim->data)[iTOffset*4+1]=(unsigned char)g;
-								((unsigned char *)pnim->data)[iTOffset*4+2]=(unsigned char)b;
-								((unsigned char *)pnim->data)[iTOffset*4+3]=(unsigned char)a;
-								++iSOffset; if(iSOffset==LENGTH(value)) iSOffset=0;
-							  }
-			  break;
+                  LOOP_START
+		    ((double*)pnim->data)[iTOffset]=(double)(NUMERIC_POINTER(value)[iSOffset]);
+                  LOOP_END
+		/* rgb (24 bits) 
+		case DT_RGB:
+                  LOOP_START
+		    unsigned r,g,b;
+		    Rprintf("%s\n",CHAR(CHARACTER_POINTER(value)[iSOffset]));
+		    sscanf(CHAR(CHARACTER_POINTER(value)[iSOffset]),"#%2X%2X%2X",&r,&g,&b);
+		    Rprintf("%d %d %d\n",r,g,b);
+		    ((unsigned char *)pnim->data)[iTOffset*3+0]=(unsigned char)r;
+		    ((unsigned char *)pnim->data)[iTOffset*3+1]=(unsigned char)g;
+		    ((unsigned char *)pnim->data)[iTOffset*3+2]=(unsigned char)b;
+		  LOOP_END*/
+		/* rgba (32 bits) 
+		case DT_RGBA32:
+                  LOOP_START
+		    unsigned r,g,b,a;
+		    sscanf(CHAR(CHARACTER_POINTER(value)[iSOffset]),"#%2X%2X%2X%2X",&r,&g,&b,&a);
+		    ((unsigned char *)pnim->data)[iTOffset*4+0]=(unsigned char)r;
+		    ((unsigned char *)pnim->data)[iTOffset*4+1]=(unsigned char)g;
+		    ((unsigned char *)pnim->data)[iTOffset*4+2]=(unsigned char)b;
+		    ((unsigned char *)pnim->data)[iTOffset*4+3]=(unsigned char)a;
+		  LOOP_END */
 		default:
-		  warning("unsupported data format (identifier %d)",pnim->datatype);
+		  warning("Unsupported data format for input type NUMERIC (nifti image datatype is %d)!",pnim->datatype);
 		}
     }
+    else if(IS_INTEGER(value))
+    {
+ 		switch(pnim->datatype)
+		{
+		/* uchar (8 bits) */
+		case DT_UNSIGNED_CHAR:
+		  LOOP_START
+				((unsigned char*)pnim->data)[iTOffset]=(unsigned char)(INTEGER_POINTER(value)[iSOffset]);
+		  LOOP_END
+		/* signed char (8 bits) */
+		case DT_INT8:
+		  LOOP_START
+		    ((signed char*)pnim->data)[iTOffset]=(signed char)(INTEGER_POINTER(value)[iSOffset]);
+		  LOOP_END
+		/* unsigned short (16 bits) */
+		case DT_UINT16:
+		  LOOP_START
+		    ((unsigned short*)pnim->data)[iTOffset]=(unsigned short)(INTEGER_POINTER(value)[iSOffset]);
+		  LOOP_END
+		// signed short (16 bits)
+		case DT_SIGNED_SHORT:
+		  LOOP_START
+ 		    ((short*)pnim->data)[iTOffset]=(short)(INTEGER_POINTER(value)[iSOffset]);
+	          LOOP_END
+		// signed int (32 bits)
+		case DT_SIGNED_INT:
+		  LOOP_START
+		    ((int*)pnim->data)[iTOffset]=(int)(INTEGER_POINTER(value)[iSOffset]);
+		  LOOP_END
+		/* unsigned int (32 bits) */
+		case DT_UINT32:
+		  LOOP_START
+		    ((unsigned int*)pnim->data)[iTOffset]=(unsigned int)(INTEGER_POINTER(value)[iSOffset]);
+	          LOOP_END
+		/* float (32 bits) */
+		case DT_FLOAT:
+		  LOOP_START
+		    ((float*)pnim->data)[iTOffset]=(float)(INTEGER_POINTER(value)[iSOffset]);
+		  LOOP_END
+		/* double (64 bits) */
+		case DT_DOUBLE:
+                  LOOP_START
+		    ((double*)pnim->data)[iTOffset]=(double)(INTEGER_POINTER(value)[iSOffset]);
+                  LOOP_END
+		default:
+		  warning("Unsupported data format for input of type INTEGER (nifti image datatype is %d)!",pnim->datatype);
+                }
+        }
 	else if(IS_CHARACTER(value))
 	{
 		switch(pnim->datatype)
 		{
 		  /* rgb (24 bits) */
 			case DT_RGB:
-			  for(iIndex[6]=0;iIndex[6]<LENGTH(coord[6]);++iIndex[6])
-					for(iIndex[5]=0;iIndex[5]<LENGTH(coord[5]);++iIndex[5])
-					  for(iIndex[4]=0;iIndex[4]<LENGTH(coord[4]);++iIndex[4])
-						for(iIndex[3]=0;iIndex[3]<LENGTH(coord[3]);++iIndex[3])
-						  for(iIndex[2]=0;iIndex[2]<LENGTH(coord[2]);++iIndex[2])
-							for(iIndex[1]=0;iIndex[1]<LENGTH(coord[1]);++iIndex[1])
-							  for(iIndex[0]=0;iIndex[0]<LENGTH(coord[0]);++iIndex[0])
-							  {
-								iTOffset =  iCoord[0][iIndex[0]]
-										  + iCoord[1][iIndex[1]]*pnim->dim[1]
-										  + iCoord[2][iIndex[2]]*pnim->dim[1]*pnim->dim[2]
-										  + iCoord[3][iIndex[3]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]
-										  + iCoord[4][iIndex[4]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]
-										  + iCoord[5][iIndex[5]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]
-										  + iCoord[6][iIndex[6]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]*pnim->dim[6];
-								unsigned r,g,b;
-								/*Rprintf("%s\n",CHAR(CHARACTER_POINTER(value)[iSOffset]));*/
-								sscanf(CHAR(CHARACTER_POINTER(value)[iSOffset]),"#%2X%2X%2X",&r,&g,&b);
-								/*Rprintf("%d %d %d\n",r,g,b);*/
-								((unsigned char *)pnim->data)[iTOffset*3+0]=(unsigned char)r;
-								((unsigned char *)pnim->data)[iTOffset*3+1]=(unsigned char)g;
-								((unsigned char *)pnim->data)[iTOffset*3+2]=(unsigned char)b;
-								++iSOffset; if(iSOffset==LENGTH(value)) iSOffset=0;
-							  }
-			  break;
+			  LOOP_START
+			    unsigned r,g,b;
+			    /*Rprintf("%s\n",CHAR(CHARACTER_POINTER(value)[iSOffset]));*/
+			    sscanf(CHAR(CHARACTER_POINTER(value)[iSOffset]),"#%2X%2X%2X",&r,&g,&b);
+			    /*Rprintf("%d %d %d\n",r,g,b);*/
+			    ((unsigned char *)pnim->data)[iTOffset*3+0]=(unsigned char)r;
+			    ((unsigned char *)pnim->data)[iTOffset*3+1]=(unsigned char)g;
+			    ((unsigned char *)pnim->data)[iTOffset*3+2]=(unsigned char)b;
+			  LOOP_END
 			/* rgba (32 bits) */
 			case DT_RGBA32:
-			  for(iIndex[6]=0;iIndex[6]<LENGTH(coord[6]);++iIndex[6])
-					for(iIndex[5]=0;iIndex[5]<LENGTH(coord[5]);++iIndex[5])
-					  for(iIndex[4]=0;iIndex[4]<LENGTH(coord[4]);++iIndex[4])
-						for(iIndex[3]=0;iIndex[3]<LENGTH(coord[3]);++iIndex[3])
-						  for(iIndex[2]=0;iIndex[2]<LENGTH(coord[2]);++iIndex[2])
-							for(iIndex[1]=0;iIndex[1]<LENGTH(coord[1]);++iIndex[1])
-							  for(iIndex[0]=0;iIndex[0]<LENGTH(coord[0]);++iIndex[0])
-							  {
-								iTOffset =  iCoord[0][iIndex[0]]
-										  + iCoord[1][iIndex[1]]*pnim->dim[1]
-										  + iCoord[2][iIndex[2]]*pnim->dim[1]*pnim->dim[2]
-										  + iCoord[3][iIndex[3]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]
-										  + iCoord[4][iIndex[4]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]
-										  + iCoord[5][iIndex[5]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]
-										  + iCoord[6][iIndex[6]]*pnim->dim[1]*pnim->dim[2]*pnim->dim[3]*pnim->dim[4]*pnim->dim[5]*pnim->dim[6];
-								unsigned r,g,b,a;
-								sscanf(CHAR(CHARACTER_POINTER(value)[iSOffset]),"#%2X%2X%2X%2X",&r,&g,&b,&a);
-								((unsigned char *)pnim->data)[iTOffset*4+0]=(unsigned char)r;
-								((unsigned char *)pnim->data)[iTOffset*4+1]=(unsigned char)g;
-								((unsigned char *)pnim->data)[iTOffset*4+2]=(unsigned char)b;
-								((unsigned char *)pnim->data)[iTOffset*4+3]=(unsigned char)a;
-								++iSOffset; if(iSOffset==LENGTH(value)) iSOffset=0;
-							  }
-			  break;
+			  LOOP_START
+			    unsigned r,g,b,a;
+			    sscanf(CHAR(CHARACTER_POINTER(value)[iSOffset]),"#%2X%2X%2X%2X",&r,&g,&b,&a);
+			    ((unsigned char *)pnim->data)[iTOffset*4+0]=(unsigned char)r;
+			    ((unsigned char *)pnim->data)[iTOffset*4+1]=(unsigned char)g;
+			    ((unsigned char *)pnim->data)[iTOffset*4+2]=(unsigned char)b;
+			    ((unsigned char *)pnim->data)[iTOffset*4+3]=(unsigned char)a;
+			  LOOP_END
 		default:
-		  warning("unsupported data format (identifier %d)",pnim->datatype);
+		  warning("Unsupported data format for input type CHARACTER (nifti image datatype is %d)",pnim->datatype);
 		}
 	}
 	else
-		error("unsupported input data format");
+	  error("Unsupported input data format (need NUMERIC, INTEGER or CHARACTER vectors)!");
     UNPROTECT(7);
   }
   return nim;
@@ -1793,4 +1675,13 @@ SEXP Rnifti_units_string(SEXP value)
 	return ret_val;
 }
 
+SEXP Rnifti_datatype_string(SEXP value)
+{
+	SEXP ret_val=R_NilValue;
+	PROTECT(value=AS_INTEGER(value));
+	if(IS_INTEGER(value) && LENGTH(value)==1)          
+	  ret_val = Rnifti_pchar_SEXP(nifti_datatype_string(INTEGER_POINTER(value)[0]));
+	UNPROTECT(1);
+	return ret_val;
+}
 
